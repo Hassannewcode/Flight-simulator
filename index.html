@@ -1,109 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>GeoFS Private Offline Flight Simulator</title>
-  <style>
-    html, body, #cesiumContainer {
-      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
-      background: black;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Private GeoFS Lite Multiplayer</title>
+<link href="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+<style>
+  html, body, #cesiumContainer {
+    width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
+    background: #87CEEB;
+  }
+  #info {
+    position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.8);
+    padding: 8px; font-family: sans-serif; font-size: 14px; border-radius: 4px;
+    z-index: 100;
+  }
+</style>
 </head>
 <body>
-  <div id="cesiumContainer"></div>
 
-  <script>
-    // Register service worker from inline blob
-    if ('serviceWorker' in navigator) {
-      const swCode = `
-        const CACHE_NAME = 'geoFS-cache-v1';
-        const FILES_TO_CACHE = [
-          'https://www.geo-fs.com/data/runwaygrid.js?k=1',
-          'https://www.geo-fs.com/data/airports.js',
-          'https://www.gstatic.com/_/mss/boq-identity/_/js/k=boq-identity.IdpIFrameHttp.en_US.tnv-Rq_TBnA.es5.O/am=AIAB/d=1/rs=AOaEmlHw15JmA15i786Jg2aXnjbWaMlreg/m=base',
-          'https://www.geo-fs.com/js/Cesium/build/Cesium.js',
-          'https://www.geo-fs.com/js/Cesium/build/Workers/when-229515d6.js',
-          'https://www.geo-fs.com/js/Cesium/build/Workers/WebGLConstants-f63312fc.js',
-          'https://www.geo-fs.com/js/Cesium/build/Workers/cesiumWorkerBootstrapper.js',
-          'https://www.geo-fs.com/js/Cesium/build/Workers/Plane-a66da2a9.js',
-          'https://www.geo-fs.com/js/Cesium/build/Workers/TerrainEncoding-0e636976.js',
-          'https://www.geo-fs.com/geofs.php?v=3.9',
-          'https://www.geo-fs.com/models/aircraft/premium/su35/texture-low_1.jpg',
-          'https://www.geo-fs.com/js/commonJS.js?kc=17',
-          'https://www.geo-fs.com/js/geofs.js?kc=394',
-          'https://www.geo-fs.com/js/loader.js'
-        ];
+<div id="cesiumContainer"></div>
+<div id="info">Room: <span id="roomId">none</span> | Players: <span id="playerCount">0</span></div>
 
-        self.addEventListener('install', event => {
-          event.waitUntil(
-            caches.open(CACHE_NAME).then(cache => {
-              return cache.addAll(FILES_TO_CACHE);
-            })
-          );
-        });
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Cesium.js"></script>
+<script>
+(async function(){
+  // Get room ID from URL query ?room=xxx
+  function getRoomId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('room') || null;
+  }
 
-        self.addEventListener('activate', event => {
-          event.waitUntil(
-            caches.keys().then(keys =>
-              Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
-            )
-          );
-        });
+  const roomId = getRoomId();
+  if(!roomId) {
+    alert('Please specify a room id in the URL, e.g. ?room=abc123');
+    return;
+  }
+  document.getElementById('roomId').textContent = roomId;
 
-        self.addEventListener('fetch', event => {
-          event.respondWith(
-            caches.match(event.request).then(cachedResponse => cachedResponse || fetch(event.request))
-          );
-        });
-      `;
-      const blob = new Blob([swCode], { type: 'application/javascript' });
-      const swUrl = URL.createObjectURL(blob);
+  // Initialize Cesium Viewer
+  const viewer = new Cesium.Viewer('cesiumContainer', {
+    animation: false,
+    timeline: false,
+    fullscreenButton: false,
+    vrButton: false,
+    infoBox: false,
+    sceneModePicker: false,
+    baseLayerPicker: false,
+    geocoder: false,
+    homeButton: false,
+    navigationHelpButton: false,
+    scene3DOnly: true,
+    terrainProvider: Cesium.createWorldTerrain({
+      requestVertexNormals: false,
+      requestWaterMask: false
+    }),
+    shadows: false,
+    shouldAnimate: false,
+  });
 
-      navigator.serviceWorker.register(swUrl).then(() => {
-        console.log('Service worker registered.');
-      }).catch(console.error);
-    } else {
-      console.warn('Service workers not supported.');
-    }
-  </script>
-
-  <script>
-    // Load scripts sequentially and initialize GeoFS
-    window.addEventListener('load', () => {
-      const loadScript = (src) => new Promise((res, rej) => {
-        const s = document.createElement('script');
-        s.src = src;
-        s.onload = res;
-        s.onerror = () => rej(new Error(`Failed to load ${src}`));
-        document.head.appendChild(s);
-      });
-
-      (async () => {
-        try {
-          // Cesium base URL must be set before loading Cesium.js
-          window.CESIUM_BASE_URL = 'https://www.geo-fs.com/js/Cesium/build/';
-
-          await loadScript('https://www.geo-fs.com/js/Cesium/build/Cesium.js');
-          await loadScript('https://www.geo-fs.com/js/commonJS.js?kc=17');
-          await loadScript('https://www.geo-fs.com/js/geofs.js?kc=394');
-          await loadScript('https://www.geo-fs.com/js/loader.js');
-
-          if (window.geofs && geofs.init) {
-            geofs.init({
-              containerId: 'cesiumContainer',
-              assetsBaseUrl: 'https://www.geo-fs.com/',
-              multiplayerServerUrl: null, // disables multiplayer public servers
-              maxPlayers: 3,
-            });
-          } else {
-            console.error('GeoFS failed to initialize.');
-          }
-        } catch (e) {
-          console.error('Error loading GeoFS scripts:', e);
+  // Player representation
+  class Player {
+    constructor(id, color) {
+      this.id = id;
+      this.entity = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(0, 0, 1000),
+        box: {
+          dimensions: new Cesium.Cartesian3(100.0, 100.0, 30.0),
+          material: color,
         }
-      })();
-    });
-  </script>
+      });
+    }
+    setPosition(lon, lat, height) {
+      this.entity.position = Cesium.Cartesian3.fromDegrees(lon, lat, height);
+    }
+    remove() {
+      viewer.entities.remove(this.entity);
+    }
+  }
+
+  // Starting position (San Francisco)
+  let myPosition = { lon: -122.4194, lat: 37.7749, height: 1000 };
+
+  // WASD controls to move position
+  window.addEventListener('keydown', e => {
+    const delta = 0.01;
+    switch(e.key.toLowerCase()) {
+      case 'w': myPosition.lat += delta; break;
+      case 's': myPosition.lat -= delta; break;
+      case 'a': myPosition.lon -= delta; break;
+      case 'd': myPosition.lon += delta; break;
+    }
+  });
+
+  // Connect to your WebSocket server here (replace with your actual server URL)
+  const serverUrl = 'wss://yourserver.example.com';
+  const ws = new WebSocket(serverUrl);
+
+  const players = new Map();
+  let myId = null;
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'join', room: roomId }));
+  };
+
+  ws.onmessage = (msg) => {
+    let data;
+    try { data = JSON.parse(msg.data); } catch(e) { return; }
+
+    if(data.type === 'welcome') {
+      myId = data.id;
+      console.log('Connected as', myId);
+    }
+    else if(data.type === 'playerlist') {
+      // Remove players no longer in room
+      for(const id of players.keys()) {
+        if(!data.players.includes(id)) {
+          players.get(id).remove();
+          players.delete(id);
+        }
+      }
+      document.getElementById('playerCount').textContent = data.players.length;
+
+      // Add new players
+      for(const id of data.players) {
+        if(id !== myId && !players.has(id)) {
+          const color = Cesium.Color.fromRandom({alpha:1.0});
+          players.set(id, new Player(id, color));
+        }
+      }
+    }
+    else if(data.type === 'position' && data.id !== myId) {
+      if(players.has(data.id)) {
+        players.get(data.id).setPosition(data.lon, data.lat, data.height);
+      }
+    }
+  };
+
+  // Send our position regularly, update our own entity
+  setInterval(() => {
+    if(myId && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'position',
+        id: myId,
+        lon: myPosition.lon,
+        lat: myPosition.lat,
+        height: myPosition.height
+      }));
+
+      if(!players.has(myId)) {
+        players.set(myId, new Player(myId, Cesium.Color.YELLOW));
+      }
+      players.get(myId).setPosition(myPosition.lon, myPosition.lat, myPosition.height);
+    }
+  }, 100);
+
+})();
+</script>
+
 </body>
 </html>
