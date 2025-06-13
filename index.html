@@ -13,38 +13,33 @@
 <body>
   <div id="cesiumContainer"></div>
 
-  <!-- Set Cesium base URL before loading Cesium -->
   <script>
     window.CESIUM_BASE_URL = './js/Cesium/build/';
   </script>
 
-  <!-- Load Cesium -->
   <script src="./js/Cesium/build/Cesium.js"></script>
 
-  <!-- Load GeoFS scripts in order -->
   <script src="./js/commonJS.js"></script>
   <script src="./js/geofs.js"></script>
   <script src="./js/loader.js"></script>
 
   <script>
-    // Register service worker for caching
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then(() => {
-        console.log('Service Worker registered');
-      }).catch(err => console.error('Service Worker registration failed:', err));
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('Service Worker registered'))
+        .catch(err => console.error('Service Worker registration failed:', err));
     }
 
-    // Initialize GeoFS after window loads and scripts are ready
     window.addEventListener('load', () => {
       if (window.geofs && geofs.init) {
         geofs.init({
           containerId: 'cesiumContainer',
           assetsBaseUrl: './',
-          multiplayerServerUrl: null,  // disables public multiplayer servers
+          multiplayerServerUrl: null,  // disable multiplayer
           maxPlayers: 3
         });
       } else {
-        console.error('GeoFS not loaded properly.');
+        console.error('GeoFS failed to load');
       }
     });
   </script>
