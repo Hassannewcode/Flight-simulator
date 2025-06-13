@@ -2,71 +2,95 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>GeoFS Private Flight Simulator + Source Downloader</title>
+  <title>GeoFS Private Offline Flight Simulator</title>
   <style>
     html, body, #cesiumContainer {
       margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000;
-    }
-    #download-status {
-      position: fixed; bottom: 10px; left: 10px; color: #0f0; font-family: monospace;
-      background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px;
-      z-index: 9999;
     }
   </style>
 </head>
 <body>
   <div id="cesiumContainer"></div>
-  <div id="download-status">Downloading GeoFS source...</div>
+
+  <script>
+    // URLs of files to cache for offline usage:
+    const FILES_TO_CACHE = [
+      'https://www.geo-fs.com/data/runwaygrid.js',
+      'https://www.geo-fs.com/data/airports.js',
+      'https://www.geo-fs.com/js/Cesium/build/Cesium.js',
+      'https://www.geo-fs.com/js/Cesium/build/Workers/when-229515d6.js',
+      'https://www.geo-fs.com/js/Cesium/build/Workers/WebGLConstants-f63312fc.js',
+      'https://www.geo-fs.com/js/Cesium/build/Workers/cesiumWorkerBootstrapper.js',
+      'https://www.geo-fs.com/js/Cesium/build/Workers/Plane-a66da2a9.js',
+      'https://www.geo-fs.com/js/Cesium/build/Workers/TerrainEncoding-0e636976.js',
+      'https://www.geo-fs.com/js/commonJS.js',
+      'https://www.geo-fs.com/js/geofs.js',
+      'https://www.geo-fs.com/js/loader.js',
+      'https://www.geo-fs.com/models/aircraft/premium/su35/texture-low_1.jpg'
+    ];
+
+    // Register a service worker from an inline script blob:
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'geoFS-cache-v1';
+        const FILES_TO_CACHE = ${JSON.stringify(FILES_TO_CACHE)};
+        
+        self.addEventListener('install', event => {
+          event.waitUntil(
+            caches.open(CACHE_NAME).then(cache => cache.addAll(FILES_TO_CACHE))
+          );
+        });
+
+        self.addEventListener('activate', event => {
+          event.waitUntil(
+            caches.keys().then(keys =>
+              Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
+            )
+          );
+        });
+
+        self.addEventListener('fetch', event => {
+          event.respondWith(
+            caches.match(event.request).then(cachedResponse => {
+              return cachedResponse || fetch(event.request);
+            })
+          );
+        });
+      `;
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(blob);
+
+      navigator.serviceWorker.register(swUrl)
+        .then(() => console.log('Service worker registered and caching started'))
+        .catch(console.error);
+    } else {
+      console.warn('Service workers not supported by this browser');
+    }
+  </script>
 
   <!-- Set Cesium base URL -->
   <script>
     window.CESIUM_BASE_URL = 'https://www.geo-fs.com/js/Cesium/build/';
   </script>
 
-  <!-- Load Cesium core -->
+  <!-- Load GeoFS -->
   <script src="https://www.geo-fs.com/js/Cesium/build/Cesium.js"></script>
-
-  <!-- Load GeoFS scripts -->
   <script src="https://www.geo-fs.com/js/commonJS.js"></script>
   <script src="https://www.geo-fs.com/js/geofs.js"></script>
   <script src="https://www.geo-fs.com/js/loader.js"></script>
 
   <script>
     window.addEventListener('load', () => {
-      // Initialize GeoFS in private mode (no multiplayer)
       if (window.geofs && geofs.init) {
         geofs.init({
           containerId: 'cesiumContainer',
           assetsBaseUrl: 'https://www.geo-fs.com/',
-          multiplayerServerUrl: null,
+          multiplayerServerUrl: null, // private, no public servers
           maxPlayers: 3
         });
       } else {
-        console.error('GeoFS scripts failed to load.');
+        console.error('GeoFS failed to load');
       }
-
-      // Fetch the full live GeoFS source and auto-download as index.html
-      fetch('https://www.geo-fs.com/geofs.php?v=3.9')
-        .then(r => r.text())
-        .then(text => {
-          const blob = new Blob([text], {type: 'text/html'});
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'index.html';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-          document.getElementById('download-status').textContent = 'GeoFS source downloaded!';
-          setTimeout(() => {
-            document.getElementById('download-status').style.display = 'none';
-          }, 3000);
-        })
-        .catch(e => {
-          console.error('Failed to fetch GeoFS source:', e);
-          document.getElementById('download-status').textContent = 'Failed to download GeoFS source.';
-        });
     });
   </script>
 </body>
