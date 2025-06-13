@@ -5,7 +5,7 @@
   <title>GeoFS Private Offline</title>
   <style>
     html, body, #cesiumContainer {
-      margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000;
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: black;
     }
   </style>
 </head>
@@ -13,18 +13,59 @@
   <div id="cesiumContainer"></div>
 
   <script>
-    // Register the service worker from sw.js in the same directory
+    // Service Worker code as a string
+    const swCode = `
+      const CACHE_NAME = 'geoFS-cache-v1';
+      const FILES_TO_CACHE = [
+        'https://www.geo-fs.com/data/runwaygrid.js?k=1',
+        'https://www.geo-fs.com/data/airports.js',
+        'https://www.geo-fs.com/js/Cesium/build/Cesium.js',
+        'https://www.geo-fs.com/js/Cesium/build/Workers/when-229515d6.js',
+        'https://www.geo-fs.com/js/Cesium/build/Workers/WebGLConstants-f63312fc.js',
+        'https://www.geo-fs.com/js/Cesium/build/Workers/cesiumWorkerBootstrapper.js',
+        'https://www.geo-fs.com/js/Cesium/build/Workers/Plane-a66da2a9.js',
+        'https://www.geo-fs.com/js/Cesium/build/Workers/TerrainEncoding-0e636976.js',
+        'https://www.geo-fs.com/js/commonJS.js',
+        'https://www.geo-fs.com/js/geofs.js',
+        'https://www.geo-fs.com/js/loader.js',
+        'https://www.geo-fs.com/models/aircraft/premium/su35/texture-low_1.jpg'
+      ];
+
+      self.addEventListener('install', event => {
+        event.waitUntil(
+          caches.open(CACHE_NAME).then(cache => cache.addAll(FILES_TO_CACHE))
+        );
+      });
+
+      self.addEventListener('activate', event => {
+        event.waitUntil(
+          caches.keys().then(keys =>
+            Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
+          )
+        );
+      });
+
+      self.addEventListener('fetch', event => {
+        event.respondWith(
+          caches.match(event.request).then(cachedResp => cachedResp || fetch(event.request))
+        );
+      });
+    `;
+
+    // Register the service worker using a Blob URL
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(() => console.log('Service Worker registered.'))
-        .catch(console.error);
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(blob);
+
+      navigator.serviceWorker.register(swUrl).then(() => {
+        console.log('Service worker registered from blob URL');
+      }).catch(console.error);
     } else {
       console.warn('Service workers not supported.');
     }
   </script>
 
   <script>
-    // Load GeoFS scripts sequentially after page load (requests intercepted by service worker)
     window.addEventListener('load', () => {
       function loadScript(src) {
         return new Promise((res, rej) => {
@@ -48,12 +89,12 @@
             geofs.init({
               containerId: 'cesiumContainer',
               assetsBaseUrl: 'https://www.geo-fs.com/',
-              multiplayerServerUrl: null,  // disables public multiplayer servers
-              maxPlayers: 1  // only 1 person (you)
+              multiplayerServerUrl: null,
+              maxPlayers: 3
             });
           }
         } catch (e) {
-          console.error('Error loading GeoFS scripts:', e);
+          console.error('Failed to load GeoFS scripts', e);
         }
       })();
     });
