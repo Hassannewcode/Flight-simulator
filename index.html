@@ -2,223 +2,146 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Single Player Flight Simulator</title>
+  <title>Minimal GeoFS-like Flight Sim</title>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.109.1/Build/Cesium/Cesium.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/cesium@1.109.1/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <style>
     html, body, #cesiumContainer {
-      width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; 
-      font-family: sans-serif;
+      width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
     }
     #hud {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 8px 12px;
+      top: 10px; left: 10px;
       background: rgba(0,0,0,0.5);
       color: white;
-      font-size: 14px;
-      z-index: 100;
-      border-radius: 6px;
-      user-select: none;
+      padding: 10px;
+      font-family: monospace;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
   <div id="cesiumContainer"></div>
   <div id="hud">
-    Speed: <span id="speed">0</span> m/s<br />
-    Altitude: <span id="altitude">0</span> m<br />
+    Speed: <span id="speed">0</span> m/s<br/>
+    Altitude: <span id="altitude">0</span> m<br/>
     Heading: <span id="heading">0</span>°
   </div>
-  <script>
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MjFiZmQ1OS03YzNmLTQyMWMtYjgzNy05NGE0OWRhNTFiZGQiLCJpZCI6MzEyMTIyLCJpYXQiOjE3NDk4OTU5NTZ9.QpsexkCzoq0D7XOBDXVAiUAEikb1OYRt937UcSg619A';
 
+  <script>
+    // Initialize Cesium Viewer
     const viewer = new Cesium.Viewer('cesiumContainer', {
       timeline: false,
       animation: false,
-      baseLayerPicker: true,
-      sceneModePicker: false,
+      baseLayerPicker: false,
       geocoder: false,
+      sceneModePicker: false,
       navigationHelpButton: false,
-      homeButton: false,
       infoBox: false,
-      fullscreenButton: false,
-      scene3DOnly: true,
+      selectionIndicator: false,
+      homeButton: false,
       terrainProvider: Cesium.createWorldTerrain()
     });
 
-    // Disable lighting to keep consistent appearance day/night
-    viewer.scene.globe.enableLighting = false;
-
-    // Plane parameters
-    let plane = {
-      position: Cesium.Cartesian3.fromDegrees(0, 0, 1000), // start 1000m above sea level
-      velocity: 0,
-      heading: 0,
-      pitch: 0,
-      roll: 0,
-      maxSpeed: 300,
-      minSpeed: 0,
-      acceleration: 1,
-      deceleration: 1.5,
-      pitchSpeed: 0.5,
-      rollSpeed: 1.0,
-      yawSpeed: 0.8,
-    };
-
-    // Load a simple model of an airplane
-    const planeEntity = viewer.entities.add({
-      name: 'Plane',
-      position: plane.position,
-      model: {
-        uri: 'https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumAir/Cesium_Air.glb',
-        minimumPixelSize: 64,
-        maximumScale: 200,
+    // Simple plane entity (box)
+    const plane = viewer.entities.add({
+      name: "Plane",
+      position: Cesium.Cartesian3.fromDegrees(0, 0, 1000),
+      box: {
+        dimensions: new Cesium.Cartesian3(2000.0, 500.0, 300.0),
+        material: Cesium.Color.RED.withAlpha(0.7),
       },
-      orientation: Cesium.Quaternion.IDENTITY,
+      orientation: Cesium.Transforms.headingPitchRollQuaternion(
+        Cesium.Cartesian3.fromDegrees(0, 0, 1000),
+        new Cesium.HeadingPitchRoll(0, 0, 0)
+      )
     });
 
-    // HUD elements
+    viewer.zoomTo(plane);
+
+    // Flight state
+    let speed = 150; // meters per second
+    let heading = 0; // degrees
+    let altitude = 1000; // meters
     const speedEl = document.getElementById('speed');
-    const altitudeEl = document.getElementById('altitude');
     const headingEl = document.getElementById('heading');
+    const altitudeEl = document.getElementById('altitude');
 
-    // Keyboard controls state
-    const keys = {
-      ArrowUp: false,
-      ArrowDown: false,
-      ArrowLeft: false,
-      ArrowRight: false,
-      KeyW: false,
-      KeyS: false,
-      KeyA: false,
-      KeyD: false,
-    };
-
-    document.addEventListener('keydown', (e) => {
-      if (keys.hasOwnProperty(e.code)) {
-        keys[e.code] = true;
-      }
-    });
-
-    document.addEventListener('keyup', (e) => {
-      if (keys.hasOwnProperty(e.code)) {
-        keys[e.code] = false;
-      }
-    });
-
-    // Helper for converting heading, pitch, roll to quaternion orientation
-    function getOrientation(heading, pitch, roll) {
-      return Cesium.Transforms.headingPitchRollQuaternion(
-        plane.position,
-        new Cesium.HeadingPitchRoll(
-          Cesium.Math.toRadians(heading),
-          Cesium.Math.toRadians(pitch),
-          Cesium.Math.toRadians(roll)
-        )
-      );
+    // WASM loading example (dummy WASM that returns 42)
+    async function loadWASM() {
+      // Minimal WASM binary compiled from (wat):
+      // (module (func (result i32) i32.const 42) (export "getAnswer" (func 0)))
+      const wasmCode = new Uint8Array([
+        0x00,0x61,0x73,0x6d,0x01,0x00,0x00,0x00,0x01,0x07,0x01,0x60,0x00,0x01,0x7f,
+        0x03,0x02,0x01,0x00,0x07,0x0b,0x01,0x09,0x67,0x65,0x74,0x41,0x6e,0x73,0x77,
+        0x65,0x72,0x00,0x00,0x0a,0x09,0x01,0x07,0x00,0x41,0x2a,0x0b
+      ]);
+      const wasmModule = await WebAssembly.instantiate(wasmCode);
+      return wasmModule.instance.exports.getAnswer();
     }
 
-    // Update function called on each frame
-    viewer.clock.onTick.addEventListener(() => {
-      // Update controls:
-      // Pitch (nose up/down) with ArrowUp/Down
-      if (keys.ArrowUp) {
-        plane.pitch = Math.min(plane.pitch + plane.pitchSpeed, 45);
-      } else if (keys.ArrowDown) {
-        plane.pitch = Math.max(plane.pitch - plane.pitchSpeed, -45);
-      } else {
-        // Auto level pitch towards 0 when no keys pressed
-        plane.pitch *= 0.9;
-      }
-
-      // Roll with A/D keys
-      if (keys.KeyA) {
-        plane.roll = Math.min(plane.roll + plane.rollSpeed, 45);
-      } else if (keys.KeyD) {
-        plane.roll = Math.max(plane.roll - plane.rollSpeed, -45);
-      } else {
-        // Auto level roll
-        plane.roll *= 0.8;
-      }
-
-      // Yaw with Left/Right arrows (turn plane horizontally)
-      if (keys.ArrowLeft) {
-        plane.heading = (plane.heading - plane.yawSpeed + 360) % 360;
-      }
-      if (keys.ArrowRight) {
-        plane.heading = (plane.heading + plane.yawSpeed) % 360;
-      }
-
-      // Throttle with W/S keys
-      if (keys.KeyW) {
-        plane.velocity = Math.min(plane.velocity + plane.acceleration, plane.maxSpeed);
-      } else if (keys.KeyS) {
-        plane.velocity = Math.max(plane.velocity - plane.deceleration, plane.minSpeed);
-      } else {
-        // Natural deceleration
-        plane.velocity *= 0.995;
-      }
-
-      // Calculate movement vector
-      const headingRad = Cesium.Math.toRadians(plane.heading);
-      const pitchRad = Cesium.Math.toRadians(plane.pitch);
-
-      // Calculate delta x, y, z in Earth-centered frame
-      const dx = plane.velocity * Math.cos(pitchRad) * Math.sin(headingRad);
-      const dy = plane.velocity * Math.sin(pitchRad);
-      const dz = plane.velocity * Math.cos(pitchRad) * Math.cos(headingRad);
-
-      // Convert Cartesian3 to Cartographic for adding movement
-      let cartographic = Cesium.Cartographic.fromCartesian(plane.position);
-      const earthRadius = 6371000; // meters average
-
-      // Approximate new position
-      cartographic.longitude += dx / (earthRadius * Math.cos(cartographic.latitude));
-      cartographic.latitude += dz / earthRadius;
-      cartographic.height += dy;
-
-      // Clamp altitude >= 0 (can't go underground)
-      if (cartographic.height < 0) {
-        cartographic.height = 0;
-      }
-
-      // Update plane position
-      plane.position = Cesium.Cartesian3.fromRadians(
-        cartographic.longitude,
-        cartographic.latitude,
-        cartographic.height
-      );
-
-      // Update entity position and orientation
-      planeEntity.position = plane.position;
-      planeEntity.orientation = getOrientation(plane.heading, plane.pitch, plane.roll);
-
-      // Move camera behind and above the plane for chase view
-      const cameraOffset = new Cesium.Cartesian3(-40, 15, -120);
-      const cameraMatrix = Cesium.Transforms.headingPitchRollToFixedFrame(
-        plane.position,
-        new Cesium.HeadingPitchRoll(
-          Cesium.Math.toRadians(plane.heading),
-          Cesium.Math.toRadians(plane.pitch),
-          Cesium.Math.toRadians(plane.roll)
-        )
-      );
-
-      const cameraPosition = Cesium.Matrix4.multiplyByPoint(cameraMatrix, cameraOffset, new Cesium.Cartesian3());
-      viewer.camera.lookAt(cameraPosition, plane.position);
-
-      // Update HUD
-      speedEl.textContent = plane.velocity.toFixed(1);
-      altitudeEl.textContent = cartographic.height.toFixed(0);
-      headingEl.textContent = Math.round(plane.heading);
+    loadWASM().then(answer => {
+      console.log("WASM loaded, getAnswer() returns:", answer);
     });
 
-    // Release camera on right click (or middle mouse button)
-    viewer.screenSpaceEventHandler.setInputAction(() => {
-      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-    }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+    // Movement update per frame
+    function updatePlanePosition(deltaSeconds) {
+      heading = heading % 360;
+      const headingRad = Cesium.Math.toRadians(heading);
+
+      // Calculate new position
+      const positionCartographic = Cesium.Cartographic.fromCartesian(plane.position.getValue(viewer.clock.currentTime));
+      const distance = speed * deltaSeconds;
+
+      // Calculate new longitude and latitude based on heading and distance (approximate)
+      const earthRadius = 6378137; // meters
+      const newLat = positionCartographic.latitude + (distance * Math.cos(headingRad)) / earthRadius;
+      const newLon = positionCartographic.longitude + (distance * Math.sin(headingRad)) / (earthRadius * Math.cos(positionCartographic.latitude));
+
+      const newPosition = Cesium.Cartesian3.fromRadians(newLon, newLat, altitude);
+      plane.position = newPosition;
+
+      // Update orientation
+      const hpr = new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(heading), 0, 0);
+      plane.orientation = Cesium.Transforms.headingPitchRollQuaternion(newPosition, hpr);
+
+      // Update HUD
+      speedEl.textContent = speed.toFixed(0);
+      altitudeEl.textContent = altitude.toFixed(0);
+      headingEl.textContent = heading.toFixed(0);
+    }
+
+    // Handle keyboard input
+    const keys = {};
+    window.addEventListener('keydown', e => {
+      keys[e.key.toLowerCase()] = true;
+    });
+    window.addEventListener('keyup', e => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // Animation loop
+    let lastTime = performance.now();
+    function animate() {
+      const currentTime = performance.now();
+      const deltaSeconds = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+
+      // Controls
+      if (keys['arrowleft']) heading -= 60 * deltaSeconds; // turn left 60 deg/s
+      if (keys['arrowright']) heading += 60 * deltaSeconds; // turn right
+      if (keys['arrowup']) speed = Math.min(speed + 50 * deltaSeconds, 300); // accelerate
+      if (keys['arrowdown']) speed = Math.max(speed - 50 * deltaSeconds, 0); // decelerate
+      if (keys['w']) altitude = Math.min(altitude + 200 * deltaSeconds, 10000); // climb
+      if (keys['s']) altitude = Math.max(altitude - 200 * deltaSeconds, 0); // descend
+
+      updatePlanePosition(deltaSeconds);
+
+      viewer.scene.requestRender();
+      requestAnimationFrame(animate);
+    }
+
+    animate();
   </script>
 </body>
 </html>
