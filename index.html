@@ -1,43 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GeoFS Private (3-player max)</title>
-  <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; }
-  </style>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>GeoFS Private (3‑player max)</title>
+  <style> html,body{margin:0;height:100%;overflow:hidden} </style>
 </head>
 <body>
 
-  <!-- 1) Monkey‑patch WebSocket before GeoFS loads -->
+  <!-- 1) Override WebSocket so GeoFS uses YOUR private server -->
   <script>
     (function(){
       const RealWS = window.WebSocket;
-      // ← Replace with your deployed server (use wss://)
-      const MY_SERVER = "wss://83df47d0-77e1-470c-87eb-0693cee5356a-00-gr8a6iku1kxy.worf.replit.dev";
-
-      function PatchedWebSocket(url, protocols) {
-        // GeoFS uses URLs containing "geo-fs.com" for multiplayer
+      const PRIVATE_WS = "wss://83df47d0-77e1-470c-87eb-0693cee5356a-00-gr8a6iku1kxy.worf.replit.dev";
+      function WS(url, protocols) {
         if (typeof url === "string" && url.includes("geo-fs.com")) {
-          url = MY_SERVER;
+          url = PRIVATE_WS;
         }
-        return protocols
-          ? new RealWS(url, protocols)
-          : new RealWS(url);
+        return protocols ? new RealWS(url, protocols) : new RealWS(url);
       }
-
-      // Copy static props and prototype
-      PatchedWebSocket.prototype = RealWS.prototype;
-      Object.keys(RealWS).forEach(key => PatchedWebSocket[key] = RealWS[key]);
-
-      // Override
-      window.WebSocket = PatchedWebSocket;
+      WS.prototype = RealWS.prototype;
+      Object.keys(RealWS).forEach(k => WS[k] = RealWS[k]);
+      window.WebSocket = WS;
     })();
   </script>
 
-  <!-- 2) Load the official GeoFS client bundle -->
+  <!-- 2) Load the official GeoFS client bundle (~1k lines) -->
   <script src="https://www.geo-fs.com/geofs.php?v=3.9"></script>
+
+  <!-- 3) “Inline” the same bundle via fetch+eval (what view-source: would show) -->
+  <script>
+    fetch('view-source:https://www.geo-fs.com/geofs.php?v=3.9')
+      .then(res => res.text())
+      .then(code => {
+        // Optional: wrap in a function to avoid leaking locals
+        (function(){
+          eval(code);
+        })();
+      })
+      .catch(console.error);
+  </script>
 
 </body>
 </html>
