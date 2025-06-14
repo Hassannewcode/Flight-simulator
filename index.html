@@ -2,61 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GeoFS Offline</title>
+  <title>Offline GeoFS Host</title>
+  <script src="/socket.io/socket.io.js"></script>
   <style>
-    html, body, #cesiumContainer {
+    body, html {
       margin: 0;
-      padding: 0;
-      width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #000;
-      font-family: sans-serif;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
     }
   </style>
 </head>
 <body>
-  <div id="cesiumContainer"></div>
-
-  <!-- CesiumJS (inserted from v3.9 or use unpkg if testing online) -->
-  <script src="https://cesium.com/downloads/cesiumjs/releases/1.55/Build/Cesium/Cesium.js"></script>
+  <!-- Your iframe loading GeoFS -->
+  <iframe id="geofsFrame" src="geofs-offline/geo-offline-index.html"></iframe>
 
   <script>
-    // Dummy geofs stub (replace with actual logic if available)
-    window.geofs = {
-      init: function () {
-        const viewer = new Cesium.Viewer('cesiumContainer', {
-          imageryProvider: new Cesium.UrlTemplateImageryProvider({
-            url: "./tiles/{z}/{x}/{y}.png",
-            maximumLevel: 18
-          }),
-          terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-          baseLayerPicker: false,
-          geocoder: false,
-          timeline: false,
-          animation: false,
-          homeButton: false,
-          navigationHelpButton: false,
-          infoBox: false,
-          sceneModePicker: false,
-        });
+    const socket = io(); // if using socket.io backend
 
-        viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(-122.375, 37.6189, 3000)
-        });
+    // Example: send a message to iframe
+    socket.on("simulateFlight", (data) => {
+      const iframe = document.getElementById("geofsFrame");
+      iframe.contentWindow.postMessage({ command: "fly", payload: data }, "*");
+    });
 
-        console.log("GeoFS Offline initialized.");
-      },
-      api: { initMultiplayer: () => {} },
-      weather: { init: () => {}, getWeather: () => {} }
-    };
-  </script>
-
-  <script>
-    // Init on load
-    window.onload = () => {
-      geofs.init();
-    };
+    // Receive messages from iframe
+    window.addEventListener("message", (event) => {
+      if (event.data.status === "ready") {
+        console.log("GeoFS is ready!");
+      }
+    });
   </script>
 </body>
 </html>
