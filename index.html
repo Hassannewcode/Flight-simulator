@@ -1,44 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>GeoFS Private (3‑player max)</title>
-  <style> html,body{margin:0;height:100%;overflow:hidden} </style>
+  <meta charset="UTF-8">
+  <title>GeoFS Offline</title>
+  <style>
+    html, body, #cesiumContainer {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: sans-serif;
+    }
+  </style>
 </head>
 <body>
+  <div id="cesiumContainer"></div>
 
-  <!-- 1) Override WebSocket so GeoFS uses YOUR private server -->
+  <!-- CesiumJS (inserted from v3.9 or use unpkg if testing online) -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.55/Build/Cesium/Cesium.js"></script>
+
   <script>
-    (function(){
-      const RealWS = window.WebSocket;
-      const PRIVATE_WS = "wss://83df47d0-77e1-470c-87eb-0693cee5356a-00-gr8a6iku1kxy.worf.replit.dev";
-      function WS(url, protocols) {
-        if (typeof url === "string" && url.includes("geo-fs.com")) {
-          url = PRIVATE_WS;
-        }
-        return protocols ? new RealWS(url, protocols) : new RealWS(url);
-      }
-      WS.prototype = RealWS.prototype;
-      Object.keys(RealWS).forEach(k => WS[k] = RealWS[k]);
-      window.WebSocket = WS;
-    })();
+    // Dummy geofs stub (replace with actual logic if available)
+    window.geofs = {
+      init: function () {
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+          imageryProvider: new Cesium.UrlTemplateImageryProvider({
+            url: "./tiles/{z}/{x}/{y}.png",
+            maximumLevel: 18
+          }),
+          terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+          baseLayerPicker: false,
+          geocoder: false,
+          timeline: false,
+          animation: false,
+          homeButton: false,
+          navigationHelpButton: false,
+          infoBox: false,
+          sceneModePicker: false,
+        });
+
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(-122.375, 37.6189, 3000)
+        });
+
+        console.log("GeoFS Offline initialized.");
+      },
+      api: { initMultiplayer: () => {} },
+      weather: { init: () => {}, getWeather: () => {} }
+    };
   </script>
 
-  <!-- 2) Load the official GeoFS client bundle (~1k lines) -->
-  <script src="https://www.geo-fs.com/geofs.php?v=3.9"></script>
-
-  <!-- 3) “Inline” the same bundle via fetch+eval (what view-source: would show) -->
   <script>
-    fetch('view-source:https://www.geo-fs.com/geofs.php?v=3.9')
-      .then(res => res.text())
-      .then(code => {
-        // Optional: wrap in a function to avoid leaking locals
-        (function(){
-          eval(code);
-        })();
-      })
-      .catch(console.error);
+    // Init on load
+    window.onload = () => {
+      geofs.init();
+    };
   </script>
-
 </body>
 </html>
